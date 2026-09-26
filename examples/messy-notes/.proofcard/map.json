@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "project": {
+    "name": "messy-notes",
+    "summary": "A notes page that also stores an English translation of each note. Mapped as found; nothing has been reorganised yet."
+  },
+  "proposals": [
+    {
+      "change": "Move note storage (read/write notes.json) out of server.js into src/notes-store.js",
+      "why": "server.js reads and writes notes.json in two places (server.js:13, :20, :26); one store module makes the data path one place to test and fix",
+      "serves": ["see-notes", "add-note"],
+      "status": "proposed"
+    },
+    {
+      "change": "Move the translation call into src/translate.js with a timeout and a fallback",
+      "why": "adding a note currently fails if the translation service is slow or down (server.js:23); isolating it lets it be tested with a fake",
+      "serves": ["add-note"],
+      "status": "proposed"
+    },
+    {
+      "change": "Delete old-utils.js",
+      "why": "nothing imports it (scan: orphan); its formatDate duplicates public/script.js and saveNotes writes a backup file nobody reads",
+      "serves": [],
+      "status": "proposed"
+    }
+  ],
+  "features": [
+    {
+      "id": "see-notes",
+      "name": "See my notes",
+      "status": "built",
+      "user_action": "Opens the page and sees the list of notes with their English translation.",
+      "flow": [
+        { "layer": "screen", "does": "Notes page", "file": "public/index.html", "find": "id=\"notes\"" },
+        { "layer": "api", "does": "Server sends the page and the script", "file": "server.js", "find": "req.url === '/script.js'" },
+        { "layer": "frontend", "does": "Loads notes and writes them into the page", "file": "public/script.js", "find": "async function load" },
+        { "layer": "api", "does": "GET /api/notes", "file": "server.js", "find": "req.url === '/api/notes' && req.method === 'GET'" },
+        { "layer": "data", "does": "Reads notes.json from the working directory", "file": "server.js", "find": "fs.readFileSync('notes.json')" }
+      ],
+      "depends_on": [],
+      "tests": [],
+      "untested": ["Everything: the project has no tests"],
+      "decisions": [],
+      "debt": [
+        { "id": "xss", "kind": "bug", "status": "open", "files": ["public/script.js"], "text": "Note text is inserted with innerHTML without escaping, so a note containing HTML runs in the page (inferred by the assistant from public/script.js:5; not demonstrated)." }
+      ]
+    },
+    {
+      "id": "add-note",
+      "name": "Add a note (with English translation)",
+      "status": "built",
+      "user_action": "Types a note and presses Add; the note appears with an English translation.",
+      "flow": [
+        { "layer": "screen", "does": "Text box and Add button", "file": "public/index.html", "find": "onclick=\"addNote()\"" },
+        { "layer": "frontend", "does": "Sends the note", "file": "public/script.js", "find": "async function addNote" },
+        { "layer": "api", "does": "POST /api/notes", "file": "server.js", "find": "req.url === '/api/notes' && req.method === 'POST'" },
+        { "layer": "external", "does": "Asks a translation service for English (needs TRANSLATE_KEY)", "file": "server.js", "find": "https://api.example-translate.com/v1/translate" },
+        { "layer": "data", "does": "Rewrites the whole notes.json", "file": "server.js", "find": "fs.writeFileSync('notes.json'" }
+      ],
+      "depends_on": ["see-notes"],
+      "tests": [],
+      "untested": ["Everything: the project has no tests", "What the user sees when the translation service fails: unknown (no error handling in server.js)"],
+      "decisions": [],
+      "debt": [
+        { "id": "translate-hack", "kind": "workaround", "status": "open", "files": ["server.js"], "text": "Marked 'temporary hack' in server.js:22. The API key and the note text are put in the URL; the text is not URL-encoded; any failure there leaves the request without a response (inferred by the assistant from server.js:23-25)." },
+        { "id": "rewrite-all", "kind": "debt", "status": "open", "files": ["server.js"], "text": "Each new note re-reads and rewrites the whole file; simultaneous adds can lose notes." }
+      ]
+    },
+    {
+      "id": "delete-note",
+      "name": "Delete a note",
+      "status": "building",
+      "user_action": "Presses x next to a note to delete it.",
+      "flow": [
+        { "layer": "screen", "does": "x button next to each note", "file": "public/script.js", "find": "onclick=\"del(" },
+        { "layer": "frontend", "does": "Sends the delete request", "file": "public/script.js", "find": "async function del" },
+        { "layer": "api", "does": "POST /api/notes/delete — no handler exists in this repo", "file": "unknown" }
+      ],
+      "depends_on": ["see-notes"],
+      "tests": [],
+      "untested": ["Everything"],
+      "decisions": [],
+      "debt": [
+        { "id": "delete-missing", "kind": "bug", "status": "open", "files": ["public/script.js"], "text": "The button calls POST /api/notes/delete but the server has no such route (scan: unhandled-call at public/script.js:14); the server answers 'not found' and the note stays." }
+      ]
+    }
+  ]
+}

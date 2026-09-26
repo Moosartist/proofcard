@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>club-events map</title>
+<style>
+:root{--bg:#f7f7f5;--panel:#fff;--ink:#1d1d1f;--mute:#6b6b70;--line:#e3e3e0;--ok:#1f7a4d;--okbg:#e6f4ec;--warn:#9a6400;--warnbg:#fdf3dc;--bad:#b3261e;--badbg:#fde8e6;--plan:#5b5bd6;--planbg:#ecebfd;--unk:#6b6b70;--unkbg:#efefef;
+--screen:#3b82f6;--frontend:#06b6d4;--api:#8b5cf6;--service:#f59e0b;--data:#10b981;--external:#ef4444}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#141416;--panel:#1d1d20;--ink:#ececec;--mute:#9a9aa0;--line:#2e2e33;--okbg:#153324;--warnbg:#3a2d10;--badbg:#3d1614;--planbg:#25254a;--unkbg:#2a2a2e;--ok:#5fd39a;--warn:#f3c05b;--bad:#ff8a80;--plan:#a5a5ff}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+header{padding:20px 24px 8px}h1{margin:0 0 4px;font-size:22px}.sub{color:var(--mute)}
+.counts{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.pill{padding:3px 10px;border-radius:99px;font-size:13px;background:var(--unkbg)}
+.pill.error{background:var(--badbg);color:var(--bad)}.pill.warn{background:var(--warnbg);color:var(--warn)}.pill.ok{background:var(--okbg);color:var(--ok)}
+main{display:grid;grid-template-columns:280px 1fr;gap:16px;padding:0 24px 24px}@media(max-width:800px){main{grid-template-columns:1fr;padding:0 12px 16px}header{padding:16px 12px 4px}}
+nav{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;align-self:start;position:sticky;top:8px}
+nav input{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);margin-bottom:6px}
+nav button{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border:0;background:none;color:var(--ink);padding:8px;border-radius:8px;cursor:pointer;font:inherit}
+nav button:hover,nav button.on{background:var(--bg)}.st{font-size:11px;padding:1px 7px;border-radius:99px;white-space:nowrap}
+.st.built{background:var(--okbg);color:var(--ok)}.st.building{background:var(--warnbg);color:var(--warn)}.st.planned{background:var(--planbg);color:var(--plan)}
+section.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:16px;overflow-x:auto}
+h2{font-size:18px;margin:0 0 4px}h3{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);margin:18px 0 6px}
+table.grid{border-collapse:collapse;width:100%;min-width:720px;font-size:13px}.grid th,.grid td{border-bottom:1px solid var(--line);padding:6px;vertical-align:top;text-align:left}
+.grid th{font-weight:600;color:var(--mute)}.grid td.fname{cursor:pointer;font-weight:600}.grid tr:hover td{background:var(--bg)}
+.chip{display:inline-block;margin:2px 3px 2px 0;padding:1px 7px;border-radius:6px;font:12px ui-monospace,Consolas,monospace;background:var(--unkbg);white-space:nowrap}
+.chip.confirmed{background:var(--okbg);color:var(--ok)}.chip.stale,.chip.broken{background:var(--badbg);color:var(--bad)}.chip.planned{background:var(--planbg);color:var(--plan);border:1px dashed var(--plan)}.chip.unverified{background:var(--warnbg);color:var(--warn)}
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0}.step{position:relative;width:200px;margin:0 26px 12px 0;padding:10px;border-radius:10px;border:1px solid var(--line);border-top:4px solid var(--c);background:var(--bg)}
+.step:not(:last-child)::after{content:'→';position:absolute;right:-21px;top:40%;color:var(--mute);font-size:18px}
+.step .lay{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--c);font-weight:700}.step .does{margin:4px 0 6px}
+.step.planned{border-style:dashed;opacity:.85}.step.stale,.step.broken{box-shadow:0 0 0 2px var(--bad) inset}
+.src{font-size:11px;color:var(--mute)}a{color:inherit}ul{margin:4px 0;padding-left:20px}
+.f{padding:6px 8px;border-radius:8px;margin:4px 0;font-size:13px}.f.error{background:var(--badbg);color:var(--bad)}.f.warn{background:var(--warnbg);color:var(--warn)}.f.info{background:var(--unkbg)}
+.legend{font-size:12px;color:var(--mute)}.legend .chip{font-family:inherit}
+.empty{color:var(--mute);font-style:italic}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title"></h1><div class="sub" id="summary"></div>
+  <div class="counts" id="counts"></div>
+  <div class="legend">Links: <span class="chip confirmed">✓ found in code</span><span class="chip unverified">· file exists, link not checked</span><span class="chip planned">○ planned, not built</span><span class="chip stale">✗ stale or missing</span><span class="chip">? unknown</span></div>
+</header>
+<main><nav><input id="q" placeholder="Find a feature or file…" aria-label="Filter"><div id="list"></div></nav><div id="content"></div></main>
+<script>
+const D={"project":{"name":"club-events","summary":"Members see upcoming club events and sign up; the organiser sees who is coming."},"generated":"2026-09-26 18:13","commit":"bdd86ce","counts":{"error":0,"warn":1,"info":0},"layers":["screen","frontend","api","service","data","external"],"features":[{"id":"list-events","name":"See upcoming events","status":"planned","user_action":"Opens the site and sees upcoming events with date, place and free places.","flow":[{"layer":"screen","does":"Home page with the list of events","file":"public/index.html","find":"id=\"events\"","state":"planned","line":null,"href":null},{"layer":"frontend","does":"Loads events from the API and shows them","file":"public/app.js","find":"function loadEvents","state":"planned","line":null,"href":null},{"layer":"api","does":"GET /api/events","file":"server.js","find":"'GET /api/events'","state":"planned","line":null,"href":null},{"layer":"service","does":"Upcoming events only, with places left","file":"src/events.js","find":"function listEvents","state":"planned","line":null,"href":null},{"layer":"data","does":"Reads events and sign-ups from data/db.json","file":"src/store.js","find":"function load","state":"planned","line":null,"href":null}],"depends_on":[],"tests":[],"untested":[],"decisions":[{"decision":"One JSON file instead of a database","why":"a club has tens of events; nothing to install or run"}],"debt":[],"findings":[]},{"id":"sign-up","name":"Sign up for an event","status":"planned","user_action":"Types name and email under an event and presses Sign up; sees a confirmation or why it failed (full, already signed up).","flow":[{"layer":"screen","does":"Sign-up form under each event","file":"public/index.html","find":"id=\"events\"","state":"planned","line":null,"href":null},{"layer":"frontend","does":"Sends the form and shows the result","file":"public/app.js","find":"function signUp","state":"planned","line":null,"href":null},{"layer":"api","does":"POST /api/events/:id/signups","file":"server.js","find":"'POST /api/events/:id/signups'","state":"planned","line":null,"href":null},{"layer":"service","does":"Checks email, capacity and duplicates","file":"src/events.js","find":"function signUp","state":"planned","line":null,"href":null},{"layer":"data","does":"Adds the sign-up to data/db.json","file":"src/store.js","find":"function save","state":"planned","line":null,"href":null}],"depends_on":["list-events"],"tests":[],"untested":[],"decisions":[],"debt":[],"findings":[]},{"id":"attendee-list","name":"Organiser sees who is coming","status":"planned","user_action":"The organiser opens the organiser page, enters the organiser key and sees each event's attendees.","flow":[{"layer":"screen","does":"Organiser page","file":"public/organiser.html","find":"id=\"key\"","state":"planned","line":null,"href":null},{"layer":"frontend","does":"Asks the API with the key, shows the list","file":"public/organiser.js","find":"function loadAttendees","state":"planned","line":null,"href":null},{"layer":"api","does":"GET /api/events/:id/signups, only with the organiser key","file":"server.js","find":"'GET /api/events/:id/signups'","state":"planned","line":null,"href":null},{"layer":"service","does":"Attendee list for one event","file":"src/events.js","find":"function attendees","state":"planned","line":null,"href":null},{"layer":"data","does":"Reads sign-ups","file":"src/store.js","find":"function load","state":"planned","line":null,"href":null}],"depends_on":["sign-up"],"tests":[],"untested":[],"decisions":[{"decision":"A shared organiser key in an environment variable, not accounts","why":"one organiser; accounts would be most of the work"}],"debt":[],"findings":[]},{"id":"reminder","name":"Email reminder the day before","status":"planned","user_action":"Each person signed up gets an email the day before the event.","flow":[{"layer":"service","does":"Finds tomorrow's events and their attendees","file":"src/reminders.js","find":"function dueReminders","state":"planned","line":null,"href":null},{"layer":"external","does":"Sends the email (provider not chosen yet)","file":"unknown","state":"unknown","line":null,"href":null}],"depends_on":["sign-up"],"tests":[],"untested":[],"decisions":[],"debt":[],"findings":[{"level":"warn","code":"UNKNOWN_LINK","message":"step 2 (external) is marked unknown: \"Sends the email (provider not chosen yet)\"","feature":"reminder"}]}],"project_findings":[],"files":4};
+const $=(s)=>document.querySelector(s);
+const e=(s)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LN={screen:'Screen',frontend:'In the browser',api:'API',service:'Server logic',data:'Data',external:'Outside services'};
+const SYM={confirmed:'✓',unverified:'·',planned:'○',stale:'✗',broken:'✗',unknown:'?'};
+function chip(l){const t=(l.file&&l.file!=='unknown'?l.file:'unknown')+(l.line?':'+l.line:'');const inner=SYM[l.state]+' '+e(t);return l.href?'<a class="chip '+l.state+'" href="'+e(l.href)+'" target="_blank" rel="noopener">'+inner+'</a>':'<span class="chip '+l.state+'" title="'+e(l.state)+'">'+inner+'</span>'}
+function header(){$('#title').textContent=(D.project.name||'Project')+' — project map';$('#summary').textContent=(D.project.summary||'')+(D.commit?'  ·  commit '+D.commit:'')+'  ·  generated '+D.generated;
+const by=s=>D.features.filter(f=>f.status===s).length;
+$('#counts').innerHTML='<span class="pill ok">'+by('built')+' built</span><span class="pill">'+by('building')+' in progress</span><span class="pill">'+by('planned')+' planned</span><span class="pill error">'+D.counts.error+' broken links</span><span class="pill warn">'+D.counts.warn+' gaps</span>'}
+function list(){const q=$('#q').value.toLowerCase();$('#list').innerHTML='<button data-id="" class="'+(cur?'':'on')+'"><span>System overview</span></button>'+D.features.filter(f=>!q||JSON.stringify(f).toLowerCase().includes(q)).map(f=>'<button data-id="'+e(f.id)+'" class="'+(cur===f.id?'on':'')+'"><span>'+e(f.name)+'</span><span class="st '+e(f.status)+'">'+e(f.status)+'</span></button>').join('');
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{location.hash=b.dataset.id?'f='+b.dataset.id:''})}
+function overview(){const cols=D.layers;let h='<section class="card"><h2>System overview</h2><div class="sub">Each row is something the user can do. Each column is a part of the system. Click a feature to follow it.</div><h3>Features × parts of the system</h3><table class="grid"><tr><th>Feature</th>'+cols.map(c=>'<th>'+LN[c]+'</th>').join('')+'<th>Tests</th></tr>';
+for(const f of D.features){h+='<tr><td class="fname" data-id="'+e(f.id)+'">'+e(f.name)+'<br><span class="st '+e(f.status)+'">'+e(f.status)+'</span></td>'+cols.map(c=>'<td>'+f.flow.filter(s=>s.layer===c).map(chip).join('')+'</td>').join('')+'<td>'+(f.tests.length?f.tests.map(chip).join(''):'<span class="empty">none</span>')+'</td></tr>'}
+h+='</table></section>';const pf=D.project_findings.filter(x=>x.level!=='info'),mess=D.project_findings.filter(x=>x.level==='info');
+h+='<section class="card"><h2>Gaps between the map and the code</h2><div class="sub">Found by scanning '+D.files+' files. These are parts of the code no feature explains yet.</div>'+(pf.length?pf.map(x=>'<div class="f '+x.level+'">'+e(x.message)+'</div>').join(''):'<p class="empty">None found.</p>')+'</section>';
+h+='<section class="card"><h2>Signs of mess worth a look</h2><div class="sub">Mechanical hints (mixed responsibilities, orphan files, calls with no handler…). Not verdicts.</div>'+(mess.length?mess.map(x=>'<div class="f info">'+e(x.message)+'</div>').join(''):'<p class="empty">None found.</p>')+'</section>';
+$('#content').innerHTML=h;document.querySelectorAll('td.fname').forEach(td=>td.onclick=()=>{location.hash='f='+td.dataset.id})}
+function feature(f){let h='<section class="card"><h2>'+e(f.name)+' <span class="st '+e(f.status)+'">'+e(f.status)+'</span></h2><div class="sub">'+(f.checked?'Map confirmed against the code at '+e(f.checked.commit.slice(0,7))+' on '+e(f.checked.date):'This entry has never been confirmed against the code.')+'</div>';
+h+='<h3>What the user does</h3><p>'+(f.user_action?e(f.user_action):'<span class="empty">unknown</span>')+'</p>';
+h+='<h3>What happens, from the screen to the data</h3><div class="flow">'+(f.flow.length?f.flow.map(s=>'<div class="step '+s.state+'" style="--c:var(--'+e(s.layer)+')"><div class="lay">'+e(LN[s.layer]||s.layer)+'</div><div class="does">'+e(s.does||'')+'</div>'+chip(s)+(s.source==='assistant'?'<div class="src">inferred by the assistant — needs review</div>':'')+(s.state==='stale'?'<div class="src">cited text "'+e(s.find)+'" is gone</div>':'')+'</div>').join(''):'<p class="empty">No steps mapped yet.</p>')+'</div>';
+if(f.depends_on&&f.depends_on.length)h+='<h3>Relies on</h3><p>'+f.depends_on.map(d=>'<a href="#f='+e(d)+'">'+e((D.features.find(x=>x.id===d)||{}).name||d)+'</a>').join(', ')+'</p>';
+h+='<h3>Tested by</h3>'+(f.tests.length?'<ul>'+f.tests.map(t=>'<li>'+chip(t)+' '+e(t.find||'')+'</li>').join('')+'</ul>':'<p class="empty">No linked tests.</p>');
+h+='<h3>Not tested</h3>'+(f.untested&&f.untested.length?'<ul>'+f.untested.map(u=>'<li>'+e(u)+'</li>').join('')+'</ul>':'<p class="empty">Nothing listed.</p>');
+h+='<h3>Why it is built this way</h3>'+(f.decisions&&f.decisions.length?'<ul>'+f.decisions.map(d=>'<li><b>'+e(d.decision)+'</b> — '+e(d.why)+'</li>').join('')+'</ul>':'<p class="empty">No decisions recorded.</p>');
+h+='<h3>Known problems and technical debt</h3>'+(f.debt&&f.debt.length?'<ul>'+f.debt.map(d=>'<li><span class="st '+(d.status==='fixed'?'built':'building')+'">'+e(d.status||'open')+'</span> <b>'+e(d.kind||'debt')+'</b>: '+e(d.text)+(d.files?' <span class="src">('+d.files.map(e).join(', ')+')</span>':'')+(d.fixed_in?' <span class="src">fixed in '+e(d.fixed_in)+'</span>':'')+'</li>').join('')+'</ul>':'<p class="empty">None recorded.</p>');
+const fs=f.findings;h+='<h3>Map vs code</h3>'+(fs.length?fs.map(x=>'<div class="f '+x.level+'">'+e(x.code)+': '+e(x.message)+'</div>').join(''):'<p class="empty">No problems found.</p>');
+$('#content').innerHTML=h+'</section>'}
+let cur='';function route(){const m=/f=([^&]+)/.exec(location.hash);cur=m?decodeURIComponent(m[1]):'';const f=D.features.find(x=>x.id===cur);if(!f)cur='';list();f?feature(f):overview();scrollTo(0,0)}
+$('#q').oninput=list;addEventListener('hashchange',route);header();route();
+</script>
+</body>
+</html>
