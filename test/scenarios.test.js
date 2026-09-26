@@ -169,7 +169,20 @@ test('high risk without a named reviewer is INCOMPLETE, not PASS', () => {
   const r = verify(dir);
   assert.strictEqual(r.code, 2, r.out);
   assert.match(r.out, /# Proofcard: INCOMPLETE/);
-  assert.match(r.out, /human review \| NOT_RUN/);
+  assert.match(r.out, /review attestation \(unverified\) \| NOT_RUN/);
+});
+
+test('a filled-in reviewer is reported as an unverified declaration, never as a proven review', () => {
+  const dir = fixture();
+  card(dir, 'pay2', {
+    title: 'Change discount rules', type: 'feature', risk: 'high', problem: 'x', ...mediumFields,
+    design: 'cart -> total', security: 'ASVS V5 input validation', review: { reviewer: 'Sam', notes: 'looked at rounding' },
+  });
+  write(dir, 'src/cart.js', FIX);
+  const r = verify(dir);
+  assert.strictEqual(r.code, 0, r.out);
+  assert.match(r.out, /\| review attestation \(unverified\) \| PASS \| card states a review by Sam; this is a declaration, not verified by Proofcard \|/);
+  assert.doesNotMatch(r.out, /human review|reviewed by/);
 });
 
 test('TODO placeholders and missing checks are not PASS', () => {
