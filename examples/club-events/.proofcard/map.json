@@ -1,0 +1,383 @@
+{
+  "version": 1,
+  "project": {
+    "name": "club-events",
+    "summary": "Members see upcoming club events and sign up; the organiser sees who is coming."
+  },
+  "structure": {
+    "public/": "what runs in the browser: pages and their scripts, no business rules",
+    "server.js": "HTTP only: routes, input parsing, status codes; calls src/, never touches files",
+    "src/events.js": "business rules: listing, sign-up rules, attendee list",
+    "src/store.js": "the only code that reads or writes the data file; every change goes through update()",
+    "test/": "one test file per part; API tests start the real server"
+  },
+  "features": [
+    {
+      "id": "list-events",
+      "name": "See upcoming events",
+      "status": "built",
+      "user_action": "Opens the site and sees upcoming events with date, place and free places.",
+      "flow": [
+        {
+          "layer": "screen",
+          "does": "Home page with the list of events",
+          "file": "public/index.html",
+          "find": "id=\"events\""
+        },
+        {
+          "layer": "api",
+          "does": "Server sends the home page and its script",
+          "file": "server.js",
+          "find": "'/': ['public/index.html'"
+        },
+        {
+          "layer": "api",
+          "does": "Server sends the page script",
+          "file": "server.js",
+          "find": "'/app.js': ['public/app.js'"
+        },
+        {
+          "layer": "frontend",
+          "does": "Loads events from the API and shows them",
+          "file": "public/app.js",
+          "find": "function loadEvents"
+        },
+        {
+          "layer": "api",
+          "does": "GET /api/events",
+          "file": "server.js",
+          "find": "'GET /api/events'"
+        },
+        {
+          "layer": "service",
+          "does": "Upcoming events only, with places left",
+          "file": "src/events.js",
+          "find": "function listEvents"
+        },
+        {
+          "layer": "data",
+          "does": "Reads events and sign-ups from data/db.json",
+          "file": "src/store.js",
+          "find": "function load"
+        }
+      ],
+      "depends_on": [],
+      "tests": [
+        {
+          "file": "test/events.test.js",
+          "find": "lists only upcoming events, soonest first, with places left"
+        },
+        {
+          "file": "test/api.test.js",
+          "find": "GET /api/events returns upcoming events"
+        },
+        {
+          "file": "test/api.test.js",
+          "find": "pages are served and unknown paths are 404"
+        }
+      ],
+      "untested": [
+        "How the list looks and behaves in a real browser (public/app.js has no automated test)"
+      ],
+      "decisions": [
+        {
+          "decision": "One JSON file instead of a database",
+          "why": "a club has tens of events; nothing to install or run"
+        }
+      ],
+      "debt": [],
+      "checked": {
+        "commit": "082e44f268c88b0e6ad95cf65d9bcab79c36ea73",
+        "date": "2026-09-26"
+      }
+    },
+    {
+      "id": "sign-up",
+      "name": "Sign up for an event",
+      "status": "built",
+      "user_action": "Types name and email under an event and presses Sign up; sees a confirmation with a cancel code, or why it failed (full, already signed up).",
+      "flow": [
+        {
+          "layer": "screen",
+          "does": "Sign-up form under each event",
+          "file": "public/index.html",
+          "find": "id=\"events\""
+        },
+        {
+          "layer": "frontend",
+          "does": "Sends the form and shows the result",
+          "file": "public/app.js",
+          "find": "function signUp"
+        },
+        {
+          "layer": "api",
+          "does": "POST /api/events/:id/signups",
+          "file": "server.js",
+          "find": "'POST /api/events/:id/signups'"
+        },
+        {
+          "layer": "service",
+          "does": "Checks email, capacity and duplicates",
+          "file": "src/events.js",
+          "find": "function signUp"
+        },
+        {
+          "layer": "data",
+          "does": "Adds the sign-up to data/db.json through the write queue",
+          "file": "src/store.js",
+          "find": "function update"
+        }
+      ],
+      "depends_on": [
+        "list-events"
+      ],
+      "tests": [
+        {
+          "file": "test/events.test.js",
+          "find": "sign-up is saved and reduces places left"
+        },
+        {
+          "file": "test/events.test.js",
+          "find": "sign-up rejects bad input, duplicates, unknown and full events"
+        },
+        {
+          "file": "test/api.test.js",
+          "find": "POST /api/events/:id/signups signs up and reports errors as JSON"
+        },
+        {
+          "file": "test/concurrency.test.js",
+          "find": "20 simultaneous sign-ups are all saved"
+        },
+        {
+          "file": "test/concurrency.test.js",
+          "find": "sign-ups and cancellations at the same moment do not undo each other"
+        }
+      ],
+      "untested": [
+        "The form in a real browser (messages, refresh after sign-up)"
+      ],
+      "decisions": [
+        {
+          "decision": "Emails are stored lower-case",
+          "why": "so Sam@x.org and sam@x.org count as the same person for duplicates"
+        },
+        {
+          "decision": "All sign-up rules live in src/events.js, not in the page",
+          "why": "the browser can be bypassed; the server must decide"
+        },
+        {
+          "decision": "Each sign-up gets a random 8-character cancel code, shown once",
+          "why": "needed by \"Cancel a sign-up\" so that only the person who signed up can cancel"
+        },
+        {
+          "decision": "All writes go through store.update (one at a time); save is no longer public",
+          "why": "simultaneous sign-ups were being lost; nothing can bypass the queue now"
+        }
+      ],
+      "debt": [
+        {
+          "id": "concurrent-writes",
+          "kind": "workaround",
+          "status": "fixed",
+          "files": [
+            "src/store.js",
+            "src/events.js"
+          ],
+          "text": "store.save rewrites the whole file after a separate store.load. Two sign-ups at the same moment can overwrite each other (the last write wins). Accepted for launch: a small club rarely has simultaneous sign-ups. Fixed: all writes go through store.update, which runs them one at a time.",
+          "fixed_in": "3ec7c3e"
+        },
+        {
+          "id": "multi-process",
+          "kind": "debt",
+          "status": "open",
+          "files": [
+            "src/store.js"
+          ],
+          "text": "The write queue only protects one server process. Running several processes on the same data file would bring the problem back; that would need a database or a file lock."
+        }
+      ],
+      "checked": {
+        "commit": "082e44f268c88b0e6ad95cf65d9bcab79c36ea73",
+        "date": "2026-09-26"
+      }
+    },
+    {
+      "id": "attendee-list",
+      "name": "Organiser sees who is coming",
+      "status": "built",
+      "user_action": "The organiser opens the organiser page, enters the organiser key and sees each event's attendees.",
+      "flow": [
+        {
+          "layer": "screen",
+          "does": "Organiser page",
+          "file": "public/organiser.html",
+          "find": "id=\"key\""
+        },
+        {
+          "layer": "api",
+          "does": "Server sends the organiser page and its script",
+          "file": "server.js",
+          "find": "'/organiser': ['public/organiser.html'"
+        },
+        {
+          "layer": "api",
+          "does": "Server sends the organiser script",
+          "file": "server.js",
+          "find": "'/organiser.js': ['public/organiser.js'"
+        },
+        {
+          "layer": "frontend",
+          "does": "Asks the API with the key, shows the list",
+          "file": "public/organiser.js",
+          "find": "function loadAttendees"
+        },
+        {
+          "layer": "api",
+          "does": "GET /api/events/:id/signups, only with the organiser key",
+          "file": "server.js",
+          "find": "'GET /api/events/:id/signups'"
+        },
+        {
+          "layer": "service",
+          "does": "Attendee list for one event",
+          "file": "src/events.js",
+          "find": "function attendees"
+        },
+        {
+          "layer": "data",
+          "does": "Reads sign-ups",
+          "file": "src/store.js",
+          "find": "function load"
+        }
+      ],
+      "depends_on": [
+        "sign-up"
+      ],
+      "tests": [
+        {
+          "file": "test/events.test.js",
+          "find": "attendee list for one event"
+        },
+        {
+          "file": "test/api.test.js",
+          "find": "GET /api/events/:id/signups needs the organiser key"
+        }
+      ],
+      "untested": [
+        "The organiser page in a real browser",
+        "What happens when ORGANISER_KEY is not set in production (returns 503; not exercised by a test)"
+      ],
+      "decisions": [
+        {
+          "decision": "A shared organiser key in an environment variable, not accounts",
+          "why": "one organiser; accounts would be most of the work"
+        }
+      ],
+      "debt": [],
+      "checked": {
+        "commit": "082e44f268c88b0e6ad95cf65d9bcab79c36ea73",
+        "date": "2026-09-26"
+      }
+    },
+    {
+      "id": "reminder",
+      "name": "Email reminder the day before",
+      "status": "planned",
+      "user_action": "Each person signed up gets an email the day before the event.",
+      "flow": [
+        {
+          "layer": "service",
+          "does": "Finds tomorrow's events and their attendees",
+          "file": "src/reminders.js",
+          "find": "function dueReminders"
+        },
+        {
+          "layer": "external",
+          "does": "Sends the email (provider not chosen yet)",
+          "file": "unknown"
+        }
+      ],
+      "depends_on": [
+        "sign-up"
+      ],
+      "tests": [],
+      "untested": [],
+      "decisions": [],
+      "debt": []
+    },
+    {
+      "id": "cancel",
+      "name": "Cancel a sign-up",
+      "status": "built",
+      "user_action": "Enters the event, their email and the cancel code shown when they signed up, and presses Cancel; the place becomes free again.",
+      "flow": [
+        {
+          "layer": "screen",
+          "does": "Cancel form on the home page",
+          "file": "public/index.html",
+          "find": "id=\"cancel\""
+        },
+        {
+          "layer": "frontend",
+          "does": "Sends event, email and code",
+          "file": "public/app.js",
+          "find": "function cancelSignUp"
+        },
+        {
+          "layer": "api",
+          "does": "POST /api/events/:id/cancellations",
+          "file": "server.js",
+          "find": "'POST /api/events/:id/cancellations'"
+        },
+        {
+          "layer": "service",
+          "does": "Removes the sign-up only if email and code match",
+          "file": "src/events.js",
+          "find": "function cancel"
+        },
+        {
+          "layer": "data",
+          "does": "Removes the sign-up from data/db.json through the write queue",
+          "file": "src/store.js",
+          "find": "function update"
+        }
+      ],
+      "depends_on": [
+        "sign-up"
+      ],
+      "tests": [
+        {
+          "file": "test/events.test.js",
+          "find": "cancel with the right email and code frees the place"
+        },
+        {
+          "file": "test/api.test.js",
+          "find": "POST /api/events/:id/cancellations cancels with the code from sign-up"
+        },
+        {
+          "file": "test/concurrency.test.js",
+          "find": "20 simultaneous sign-ups are all saved"
+        },
+        {
+          "file": "test/concurrency.test.js",
+          "find": "sign-ups and cancellations at the same moment do not undo each other"
+        }
+      ],
+      "untested": [
+        "The cancel form in a real browser",
+        "Someone who lost their code has no way to cancel (by design for now)"
+      ],
+      "decisions": [
+        {
+          "decision": "Cancelling needs a secret code given at sign-up",
+          "why": "with email alone, anyone could cancel someone else's place"
+        }
+      ],
+      "debt": [],
+      "checked": {
+        "commit": "082e44f268c88b0e6ad95cf65d9bcab79c36ea73",
+        "date": "2026-09-26"
+      }
+    }
+  ]
+}

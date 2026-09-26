@@ -1,0 +1,13 @@
+{
+  "title": "Simultaneous sign-ups get lost",
+  "type": "bugfix",
+  "risk": "medium",
+  "feature": ["sign-up", "cancel"],
+  "problem": "Reported: two people signed up at the same moment, only one is in the list. Reproduced with test/concurrency.test.js (20 simultaneous sign-ups keep only 1). Cause: signUp and cancel do store.load → change → store.save; concurrent requests load the same old state and the last save wins (map debt 'concurrent-writes').",
+  "facts": ["src/events.js signUp and cancel both call store.load() then store.save(db)", "src/store.js save() rewrites the whole file"],
+  "assumptions": ["The site runs as a single Node process (true for `npm start`)"],
+  "must_not_change": ["API responses and status codes", "Data file format"],
+  "scope": ["src/store.js", "src/events.js", "test/**"],
+  "later": ["Several server processes sharing one file would still conflict; needs a real database or file lock"],
+  "regression": { "command": "node --test test/concurrency.test.js", "files": ["test/concurrency.test.js", "test/helpers.js"] }
+}
