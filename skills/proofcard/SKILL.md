@@ -14,7 +14,7 @@ Match effort to risk. Do not add ceremony to a small, reversible change.
 |---|---|---|
 | low | copy, docs, config value, isolated one-liner, easy to revert | card with title/type/risk, run the checks |
 | medium | new behaviour, bug fix, anything touching shared code | + problem, facts vs assumptions, must_not_change, scope; bug fixes need a regression test that fails before the fix |
-| high | auth, payments, data migration, public API, security-sensitive input, wide refactor | + design (data flow, dependencies), security areas considered, named human reviewer |
+| high | auth, payments, data migration, public API, security-sensitive input, wide refactor | + design (data flow, dependencies), security areas considered, review attestation (the reviewer's name and notes; Proofcard does not verify it — never present it as proof of review) |
 
 If unsure between two levels, pick the higher one and say why.
 

@@ -25,12 +25,12 @@ People who build real products with AI coding assistants on an **existing** repo
 
 | Evidence | When | How |
 |---|---|---|
-| **change card** | always | `.proofcard/changes/<slug>.json`: title, type, risk. Medium adds problem, facts vs assumptions, must-not-change, scope. High adds design, security areas, a named reviewer. `TODO` counts as missing. |
+| **change card** | always | `.proofcard/changes/<slug>.json`: title, type, risk. Medium adds problem, facts vs assumptions, must-not-change, scope. High adds design, security areas, and a review attestation. `TODO` counts as missing. |
 | **scope** | if scope declared (required for medium/high) | every changed file (vs. the merge-base with `base`, plus untracked files) must match the card's globs |
 | **secret scan** | always | pattern scan of *added* lines only (private keys, AWS/GitHub/Slack tokens, `sk-…`, hard-coded passwords). Mute one line with `proofcard:allow-secret`. |
 | **regression proof** | bug fixes (required for medium/high) | copies your regression test into a clean `git worktree` of the pre-change code and runs it: it **must fail there** and **pass on your code** |
 | **project checks** | always | runs each command in `proofcard.json` and records its exit code |
-| **human review** | high risk | NOT_RUN until `review.reviewer` and `review.notes` are filled in. Checks are not a review. |
+| **review attestation (unverified)** | high risk | NOT_RUN until `review.reviewer` and `review.notes` are filled in. This is a **declaration written in the card**: Proofcard does not check that the person exists, that a GitHub review happened, or that the notes are true. Use GitHub branch protection (required approving reviews) if you need proof of review. |
 
 Verdict: **FAIL** if any required item failed, otherwise **INCOMPLETE** if any required item was NOT_RUN, otherwise **PASS**. Exit codes are 0 / 1 / 2, so CI and agents can't read a NOT_RUN as a pass.
 
@@ -50,9 +50,13 @@ git add -A && git commit -m "chore: add proofcard"
 - `--codex` adds the same workflow to `AGENTS.md` between `<!-- proofcard -->` markers (re-running replaces it rather than duplicating).
 - Commit the setup on its own first. Otherwise the setup files count as out-of-scope changes in your first card.
 
-Optional CI gate: copy [`examples/workflow/proofcard.yml`](examples/workflow/proofcard.yml) to `.github/workflows/`. It uses this repo as a GitHub Action (`Moosartist/proofcard@v0.1.0`), fails the PR unless the verdict is PASS, and writes the report into the job summary. Pair it with branch protection to make it a real gate.
+Optional CI gate: copy [`examples/workflow/proofcard.yml`](examples/workflow/proofcard.yml) to `.github/workflows/`. It uses this repo as a GitHub Action (`Moosartist/proofcard@v0.1.1`), fails the PR unless the verdict is PASS, and writes the report into the job summary. Pair it with branch protection to make it a real gate.
 
-> **Status in v0.1.0:** the CLI and its scenarios are tested in CI; the composite Action itself has **not yet been exercised on a real pull request**. Treat it as experimental.
+Tested on a real pull request ([proofcard-action-demo#1](https://github.com/Moosartist/proofcard-action-demo/pull/1)), using this Action exactly as a user would:
+- regression test without the fix → the step fails with `# Proofcard: FAIL` ([run](https://github.com/Moosartist/proofcard-action-demo/actions/runs/36255797233), attempt 2, commit `7c832a6`)
+- fix pushed → `# Proofcard: PASS` ([run](https://github.com/Moosartist/proofcard-action-demo/actions/runs/36255881107), commit `7a08029`)
+
+Only `pull_request` on `ubuntu-latest` with `fetch-depth: 0` has been exercised. Other events and runners haven't been tested yet.
 
 ## Full example (bug fix)
 
@@ -95,9 +99,8 @@ What's actually different: the output is a **verdict computed from execution** (
 - A check that exits 0 without running anything (e.g. a test runner that finds no files) counts as PASS. Proofcard can't see inside your commands.
 - The secret scan is pattern-based: it misses unknown formats and can flag false positives.
 - The regression proof runs in a fresh worktree **without your installed dependencies**. For projects that need them, set `regression.setup` (e.g. `"npm ci"`). If setup fails, the item is NOT_RUN.
-- The GitHub Action is untested on real PRs in v0.1.0 (see Install).
 - Cards are JSON. Scope globs support `*`, `**`, `?` only.
-- Proofcard isn't a substitute for an experienced engineer's review. For high-risk changes it deliberately stays INCOMPLETE until a person signs the review.
+- Proofcard isn't a substitute for an experienced engineer's review, and it does not verify reviews. For high-risk changes it stays INCOMPLETE until a review attestation is filled in; a PASS on that row means only that the card *claims* a review.
 
 ## Development
 
@@ -105,7 +108,7 @@ What's actually different: the output is a **verdict computed from execution** (
 npm test
 ```
 
-Runs unit tests plus end-to-end scenarios that copy `examples/tiny-shop` into temporary git repos and drive the real CLI (feature → PASS, bug fix red→green, weak regression test → FAIL, failing check → FAIL, low-risk path, scope violation, secret, high risk without reviewer → INCOMPLETE, `init`). CI runs them on Ubuntu and Windows, Node 20 and 22.
+Runs unit tests plus end-to-end scenarios that copy `examples/tiny-shop` into temporary git repos and drive the real CLI (feature → PASS, bug fix red→green, weak regression test → FAIL, failing check → FAIL, low-risk path, scope violation, secret, high risk without review attestation → INCOMPLETE, filled attestation labelled unverified, Action never writes into the workspace, `init`). CI runs them on Ubuntu and Windows, Node 20 and 22.
 
 ## License
 

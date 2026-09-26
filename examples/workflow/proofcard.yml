@@ -15,4 +15,4 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - uses: Moosartist/proofcard@v0.1.0
+      - uses: Moosartist/proofcard@v0.1.1
