@@ -22,8 +22,9 @@ runs:
         args=(verify --base "${PC_BASE:-$PC_DEFAULT_BASE}")
         [ -n "$PC_CARD" ] && args+=(--card "$PC_CARD")
         set +e
-        node "$GITHUB_ACTION_PATH/bin/proofcard.js" "${args[@]}" | tee proofcard-out.md
+        # Keep the captured report out of the workspace, or verify would see it as a changed file.
+        out="$RUNNER_TEMP/proofcard-out.md"
+        node "$GITHUB_ACTION_PATH/bin/proofcard.js" "${args[@]}" | tee "$out"
         code=${PIPESTATUS[0]}
-        cat proofcard-out.md >> "$GITHUB_STEP_SUMMARY"
-        rm -f proofcard-out.md
+        cat "$out" >> "$GITHUB_STEP_SUMMARY"
         exit $code

@@ -18,3 +18,12 @@ test('scanSecrets flags credentials but honours the allow marker', () => {
   assert.strictEqual(scanSecrets([{ file: 'a', line: 1, text: `password = "hunter2hunter2" // proofcard:allow-secret` }]).length, 0);
   assert.strictEqual(scanSecrets([{ file: 'a', line: 1, text: 'const total = price * qty;' }]).length, 0);
 });
+
+test('action.yml never writes into the checked-out workspace while verify runs', () => {
+  // Regression: v0.1.0 tee'd output to ./proofcard-out.md, which verify then saw as an out-of-scope change.
+  const action = require('fs').readFileSync(require('path').join(__dirname, '..', 'action.yml'), 'utf8');
+  for (const m of action.matchAll(/(?:tee|>>?)\s+"?([^"\s|]+)/g)) {
+    assert.match(m[1], /^\$(RUNNER_TEMP|GITHUB_STEP_SUMMARY|out)\b/, `writes to ${m[1]}`);
+  }
+  assert.match(action, /out="\$RUNNER_TEMP\//);
+});
