@@ -1,0 +1,18 @@
+# Copy to .github/workflows/proofcard.yml in your project.
+# Setup steps (setup-node, npm ci, ...) must come before the gate so your checks can run.
+name: proofcard
+on: pull_request
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the gate needs the base branch history
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - uses: Moosartist/proofcard@v0.1.0

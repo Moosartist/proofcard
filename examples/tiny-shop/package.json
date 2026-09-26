@@ -1,0 +1,9 @@
+{
+  "name": "tiny-shop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Deliberately tiny example project used to prove the Proofcard workflow.",
+  "scripts": {
+    "test": "node --test"
+  }
+}

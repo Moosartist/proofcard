@@ -1,0 +1,29 @@
+name: Proofcard verify
+description: Run `proofcard verify` on a pull request and fail the job unless the verdict is PASS.
+branding: { icon: check-square, color: green }
+inputs:
+  base:
+    description: Git ref to compare against. Defaults to the PR base branch.
+    required: false
+    default: ''
+  card:
+    description: Card slug or path. Defaults to the single card changed in the diff.
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        PC_BASE: ${{ inputs.base }}
+        PC_CARD: ${{ inputs.card }}
+        PC_DEFAULT_BASE: ${{ github.base_ref && format('origin/{0}', github.base_ref) || 'HEAD~1' }}
+      run: |
+        args=(verify --base "${PC_BASE:-$PC_DEFAULT_BASE}")
+        [ -n "$PC_CARD" ] && args+=(--card "$PC_CARD")
+        set +e
+        node "$GITHUB_ACTION_PATH/bin/proofcard.js" "${args[@]}" | tee proofcard-out.md
+        code=${PIPESTATUS[0]}
+        cat proofcard-out.md >> "$GITHUB_STEP_SUMMARY"
+        rm -f proofcard-out.md
+        exit $code
