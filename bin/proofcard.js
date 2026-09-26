@@ -3,16 +3,20 @@
 const fs = require('fs');
 const path = require('path');
 const { verify, newCard, detectChecks, CONFIG } = require('../lib/proofcard');
+const { ready, createBrief } = require('../lib/ready');
 
-const HELP = `proofcard — evidence gate for AI-assisted changes
+const HELP = `proofcard — from idea to a publishable, verified result with an AI assistant
 
-  proofcard init [--claude] [--codex]   create ${CONFIG} from package.json scripts;
+  proofcard init [--claude] [--codex]   create ${CONFIG} (checks from package.json scripts)
+                                        and the project brief .proofcard/brief.md;
                                         --claude installs the Claude Code skill,
                                         --codex adds the workflow to AGENTS.md
   proofcard new "<title>" [--type feature|bugfix|refactor|chore|docs] [--risk low|medium|high]
-  proofcard verify [--card <slug|path>] [--base <ref>] [--json]
+  proofcard verify [--card <slug|path>] [--base <ref>] [--json]   evidence for one change
+  proofcard ready [--json]                                       is the committed project ready to publish?
 
-Exit codes of verify: 0 PASS, 1 FAIL, 2 INCOMPLETE (something required was NOT_RUN).`;
+Exit codes: verify 0 PASS, 1 FAIL, 2 INCOMPLETE; ready 0 READY, 1 NOT_READY, 2 INCOMPLETE.
+INCOMPLETE means something required was NOT_RUN; it is never counted as passing.`;
 
 function parse(argv) {
   const args = { _: [] };
@@ -40,6 +44,7 @@ function init(root, args) {
     fs.writeFileSync(cfgFile, JSON.stringify({ base: 'main', checks }, null, 2) + '\n');
     done.push(`wrote ${CONFIG} with ${checks.length} check(s)${checks.length ? ': ' + checks.map((c) => c.name).join(', ') : ' — add your test/build commands to "checks"'}`);
   }
+  if (createBrief(root)) done.push(`wrote .proofcard/brief.md — fill it in before building (proofcard ready checks it)`);
   const gi = path.join(root, '.gitignore');
   const giText = fs.existsSync(gi) ? fs.readFileSync(gi, 'utf8') : '';
   if (!giText.includes('.proofcard/reports')) {
@@ -84,6 +89,12 @@ function main() {
       if (args.json) console.log(JSON.stringify({ ...r, markdown: undefined }, null, 2));
       else console.log(r.markdown + `Report saved to ${r.reportPath}`);
       return { PASS: 0, FAIL: 1, INCOMPLETE: 2 }[r.verdict];
+    }
+    if (cmd === 'ready') {
+      const r = ready(root);
+      if (args.json) console.log(JSON.stringify({ ...r, markdown: undefined }, null, 2));
+      else console.log(r.markdown + `Report saved to ${r.reportPath}`);
+      return { READY: 0, NOT_READY: 1, INCOMPLETE: 2 }[r.verdict];
     }
     console.log(HELP);
     return cmd && cmd !== 'help' && cmd !== '--help' ? 64 : 0;

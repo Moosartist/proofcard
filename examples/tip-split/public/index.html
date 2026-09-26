@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Split the bill</title>
+  <style>
+    body { font: 16px/1.4 system-ui, sans-serif; max-width: 26rem; margin: 2rem auto; padding: 0 1rem; }
+    label { display: block; margin: .75rem 0 .25rem; }
+    input { width: 100%; font-size: 1.1rem; padding: .4rem; box-sizing: border-box; }
+    button { margin-top: 1rem; font-size: 1.1rem; padding: .5rem 1rem; }
+    #error { color: #b00020; }
+  </style>
+</head>
+<body>
+  <h1>Split the bill</h1>
+  <form id="form">
+    <label for="bill">Bill amount</label>
+    <input id="bill" inputmode="decimal" autocomplete="off" placeholder="100.00" required>
+    <label for="tip">Tip %</label>
+    <input id="tip" inputmode="decimal" value="10">
+    <label for="people">People</label>
+    <input id="people" inputmode="numeric" value="2">
+    <button type="submit">Split</button>
+  </form>
+  <p id="error" role="alert"></p>
+  <ol id="result" aria-live="polite"></ol>
+  <script src="/split.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

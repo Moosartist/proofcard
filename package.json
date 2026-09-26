@@ -1,12 +1,35 @@
 {
   "name": "proofcard",
-  "version": "0.1.1",
-  "description": "Evidence gate for AI-assisted changes: change cards, real checks, regression proof, honest PASS/FAIL/NOT_RUN reports.",
-  "bin": { "proofcard": "bin/proofcard.js" },
-  "files": ["bin", "lib", "skills", "integrations", "action.yml"],
-  "scripts": { "test": "node --test test/unit.test.js test/scenarios.test.js" },
-  "engines": { "node": ">=20" },
-  "keywords": ["ai", "claude-code", "codex", "verification", "code-review", "regression-test", "agents"],
-  "repository": { "type": "git", "url": "git+https://github.com/Moosartist/proofcard.git" },
+  "version": "0.2.0",
+  "description": "One path for AI-assisted building: project brief, risk-sized change cards, real verification, and an honest release-readiness report.",
+  "bin": {
+    "proofcard": "bin/proofcard.js"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "skills",
+    "integrations",
+    "action.yml"
+  ],
+  "scripts": {
+    "test": "node --test test/unit.test.js test/scenarios.test.js test/ready.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "ai",
+    "claude-code",
+    "codex",
+    "verification",
+    "code-review",
+    "regression-test",
+    "agents"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Moosartist/proofcard.git"
+  },
   "license": "MIT"
 }
