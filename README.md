@@ -52,6 +52,8 @@ git add -A && git commit -m "chore: add proofcard"
 
 Optional CI gate: copy [`examples/workflow/proofcard.yml`](examples/workflow/proofcard.yml) to `.github/workflows/`. It uses this repo as a GitHub Action (`Moosartist/proofcard@v0.1.0`), fails the PR unless the verdict is PASS, and writes the report into the job summary. Pair it with branch protection to make it a real gate.
 
+> **Status in v0.1.0:** the CLI and its scenarios are tested in CI; the composite Action itself has **not yet been exercised on a real pull request**. Treat it as experimental.
+
 ## Full example (bug fix)
 
 The repo ships [`examples/tiny-shop`](examples/tiny-shop), a cart module with a known bug: `cartTotal` ignores `qty`.
@@ -93,6 +95,7 @@ What's actually different: the output is a **verdict computed from execution** (
 - A check that exits 0 without running anything (e.g. a test runner that finds no files) counts as PASS. Proofcard can't see inside your commands.
 - The secret scan is pattern-based: it misses unknown formats and can flag false positives.
 - The regression proof runs in a fresh worktree **without your installed dependencies**. For projects that need them, set `regression.setup` (e.g. `"npm ci"`). If setup fails, the item is NOT_RUN.
+- The GitHub Action is untested on real PRs in v0.1.0 (see Install).
 - Cards are JSON. Scope globs support `*`, `**`, `?` only.
 - Proofcard isn't a substitute for an experienced engineer's review. For high-risk changes it deliberately stays INCOMPLETE until a person signs the review.
 
