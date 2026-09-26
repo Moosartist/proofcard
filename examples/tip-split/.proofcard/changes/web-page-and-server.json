@@ -1,0 +1,14 @@
+{
+  "title": "Web page and static server",
+  "type": "feature",
+  "risk": "high",
+  "problem": "Users need the split in a phone browser (brief: Users, Success criteria 3-4). Serve one page plus split.js from a tiny Node server that is also the deploy target.",
+  "facts": ["src/split.js exposes window.splitBill when loaded without CommonJS (src/split.js, last lines)"],
+  "assumptions": ["Hosts set PORT; default 3000 is fine locally"],
+  "must_not_change": ["splitBill behaviour and its tests", "No runtime dependencies"],
+  "scope": ["public/**", "server.js", "scripts/smoke.js", "package.json", "proofcard.json"],
+  "design": "Browser: form -> app.js parses amounts to integer cents -> window.splitBill -> list. Server: GET / -> public/index.html, GET /app.js, GET /split.js -> src/split.js; everything else 404. Files come from an allow-list, never from joining the URL onto a directory.",
+  "security": "OWASP ASVS V12 (files/resources): allow-list of served paths, so path traversal (/../package.json, encoded variants) cannot reach the filesystem; the smoke test asserts 404 for traversal attempts. V14: nosniff and CSP default-src 'self'. No user data is stored or sent.",
+  "review": { "reviewer": "", "notes": "" },
+  "later": []
+}

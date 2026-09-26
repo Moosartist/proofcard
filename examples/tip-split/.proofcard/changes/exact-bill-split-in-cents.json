@@ -1,0 +1,11 @@
+{
+  "title": "Exact bill split in cents",
+  "type": "feature",
+  "risk": "medium",
+  "problem": "Need splitBill({ billCents, tipPercent, people }) whose shares add up exactly to bill + tip and differ by at most one cent (brief: Success criteria 1-2).",
+  "facts": ["Empty project: no existing code or tests to preserve (git ls-files shows only setup files)"],
+  "assumptions": ["Tip is rounded to the nearest cent before splitting (half up)"],
+  "must_not_change": ["Project setup files (.proofcard/brief.md, proofcard.json)"],
+  "scope": ["src/split.js", "test/split.test.js"],
+  "later": []
+}
