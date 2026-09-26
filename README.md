@@ -1,122 +1,120 @@
 # Proofcard
 
-**One path for building a tool or website with an AI assistant, from the idea to "is it ready to publish?", where every verdict comes from what actually ran.**
+**A living map of your project, kept honest by your code.** For every feature, one page shows what the user does, which screen and files do it, what happens behind the screen, where the data goes, what it relies on, which tests cover it, what isn't tested, why it's built that way, and its known problems. Every link points at a real line of code and is checked again on every run.
+
+It's built for projects made with Claude Code or Codex. The assistant reads the map before a change and updates it after, and the tool catches it when the map and the code drift apart.
+
+![Project map: features × parts of the system, every link found in code](docs/images/overview.png)
+
+**See it live:** [club-events map](https://moosartist.github.io/proofcard/demo/club-events.html) · [the same project at the idea stage](https://moosartist.github.io/proofcard/demo/club-events-at-idea-stage.html) · [a messy app, mapped as found](https://moosartist.github.io/proofcard/demo/messy-notes.html)
+
+## In one minute
+
+A project that "works" can still be a tangle nobody understands, including the assistant that wrote it, three months later. Proofcard keeps one file, `.proofcard/map.json`, in your repo. It lists the things a user can do ("Sign up for an event", "Upload a file", "Prepare a quote"), and for each one the journey through the system:
 
 ```
-idea or existing repo
-  → brief        .proofcard/brief.md: problem, users, success criteria, design, decisions, what's not tested
-  → changes      one at a time: card → build → `proofcard verify`   (evidence sized to the risk)
-  → release      `proofcard ready`: one report that says what this is, what was tested, what wasn't, and READY or not
+Screen → In the browser → API → Server logic → Data → Outside services
+public/index.html:11 → public/app.js:24 → server.js:47 → src/events.js:26 → src/store.js:31
 ```
 
-Your assistant (Claude Code or Codex) follows the path through a skill / `AGENTS.md` section. You read two things: the **brief** (before building) and the **ready report** (before publishing). Proofcard itself is a zero-dependency Node CLI that works on any git repo. It doesn't replace your framework or your planning tools.
+Each step names a file and a short piece of text from it. `proofcard map check` looks for that text in the code:
 
-## The problem
+- ✓ **found**: the link is real, and the view links to that exact line.
+- ○ **planned**: not built yet, and that's expected.
+- ✗ **stale / missing**: the code changed and the map didn't, so this is an error.
+- **? unknown**: the map admits it doesn't know. It never makes a link up.
 
-With an AI assistant it's easy to get something that *looks* done: the UI works and the assistant says "all tests pass". Behind it there may be no shared understanding of what was built or why, unrelated edits, a test that never caught the bug, a server nobody started, or a check that never ran. Planning tools (OpenSpec, Spec Kit, Superpowers, BMad) help with specs and plans. What's usually missing is a light, honest thread from **the intent** to **the evidence**, sized to the risk and not to a ceremony.
+When code changes after a feature was last reviewed, the map shows **drift**, and flags "code changed but its tests didn't". When you come back months later, `proofcard map impact <file>` tells you where to start, what else is affected, which tests to re-run, and which known problems live there.
 
-## Who it's for
+![One feature: the journey, tests, what is not tested, decisions and debt](docs/images/feature-sign-up.png)
 
-Anyone building a real tool or site with Claude Code or Codex, from an idea or on an existing repository, who wants to understand what was built and to know, not guess, whether it's ready to publish.
+## Try it (2 minutes, Node 20+ and git)
 
-## The path in practice
+```bash
+git clone https://github.com/Moosartist/proofcard
+cd proofcard/examples/club-events
+node ../../bin/proofcard.js map check              # does the map match the code?
+node ../../bin/proofcard.js map show sign-up       # one feature, screen to data
+node ../../bin/proofcard.js map impact src/store.js
+node ../../bin/proofcard.js map view               # writes .proofcard/map.html; open it in a browser
+```
 
-| Step | You (the person) | The assistant | Proofcard checks |
-|---|---|---|---|
-| **Brief** | answer questions, approve the one-page brief | drafts it from the idea, or from existing code with guesses marked as assumptions | every section filled, no TODO (`ready`) |
-| **Each change** | pick or approve the risk; review high-risk changes | card → small build → `verify` | card complete for the risk, scope, secrets in added lines, bug-fix regression red→green, project checks |
-| **Ready** | read the report; do what it says is missing | updates "Not tested / known limits", commits, runs `ready` | brief, clean committed state, review attestations for high-risk cards, whole-repo secrets and `.env`, checks, **smoke run of the real app**, production dependency audit, README |
+[docs/MAP-WALKTHROUGH.md](docs/MAP-WALKTHROUGH.md) is the real record of building that example: idea → map → build → new feature → a bug found months later through the map → fixed → map updated.
 
-`ready` exits 0 **READY**, 1 **NOT_READY**, or 2 **INCOMPLETE** (something required was NOT_RUN, e.g. no smoke command, or a high-risk change nobody has reviewed yet). NOT_RUN never counts as passing.
-
-**Worked example:** [`examples/tip-split`](examples/tip-split), a small bill-splitting web page built from an idea through the whole path. The record, including what the trial run found and fixed in Proofcard, is in [docs/FULL-PATH.md](docs/FULL-PATH.md). Its published state is honestly **INCOMPLETE**: everything automated passes, and the release waits for a person to review the high-risk server change.
-
-## `verify`: evidence for one change
-
-| Evidence | When | How |
-|---|---|---|
-| **change card** | always | `.proofcard/changes/<slug>.json`: title, type, risk. Medium adds problem, facts vs assumptions, must-not-change, scope. High adds design, security areas, and a review attestation. `TODO` counts as missing. |
-| **scope** | if scope declared (required for medium/high) | every changed file (vs. the merge-base with `base`, plus untracked files) must match the card's globs |
-| **secret scan** | always | pattern scan of *added* lines only (private keys, AWS/GitHub/Slack tokens, `sk-…`, hard-coded passwords). Mute one line with `proofcard:allow-secret`. |
-| **regression proof** | bug fixes (required for medium/high) | copies your regression test into a clean `git worktree` of the pre-change code and runs it: it **must fail there** and **pass on your code** |
-| **project checks** | always | runs each command in `proofcard.json` and records its exit code |
-| **review attestation (unverified)** | high risk | NOT_RUN until `review.reviewer` and `review.notes` are filled in. This is a **declaration written in the card**: Proofcard does not check that the person exists, that a GitHub review happened, or that the notes are true. Use GitHub branch protection (required approving reviews) if you need proof of review. |
-
-Verdict: **FAIL** if any required item failed, otherwise **INCOMPLETE** if any required item was NOT_RUN, otherwise **PASS**. Exit codes are 0 / 1 / 2, so CI and agents can't read a NOT_RUN as a pass.
-
-A low-risk change (docs, copy, an isolated one-liner) only gets card + secret scan + checks. No design doc, no forced test.
-
-## Install (existing project, Node ≥ 20, git)
-
-No npm publish yet, so run it straight from GitHub:
+## Use it on your project
 
 ```bash
 npx github:Moosartist/proofcard init --claude --codex
 git add -A && git commit -m "chore: add proofcard"
 ```
 
-- Creates `.proofcard/brief.md` (template) if missing. Fill it in with your assistant before building.
-- Add a `"smoke"` command to `proofcard.json` that starts the real thing and checks it answers. See [the example's](examples/tip-split/scripts/smoke.js).
+`--claude` installs the skill for Claude Code, and `--codex` adds the same workflow to `AGENTS.md`. From then on, just ask your assistant for work as usual. The skill tells it to work from the map.
 
-- `proofcard.json` gets your `typecheck` / `lint` / `test` / `build` npm scripts if they exist. For other stacks, edit `checks` by hand, e.g. `{ "name": "test", "run": "pytest -q" }`. Set `base` to your main branch.
-- `--claude` installs the skill at `.claude/skills/proofcard/SKILL.md` (Claude Code picks it up automatically).
-- `--codex` adds the same workflow to `AGENTS.md` between `<!-- proofcard -->` markers (re-running replaces it rather than duplicating).
-- Commit the setup on its own first. Otherwise the setup files count as out-of-scope changes in your first card.
+**If you're starting from an idea:** ask the assistant to map the features first. They go in as `planned`, with the files they'll need and a one-line responsibility for each part of the project. You approve the map (`proofcard map view`), then it builds feature by feature, and each feature turns `built` only when its links are found in the code.
 
-Optional CI gate: copy [`examples/workflow/proofcard.yml`](examples/workflow/proofcard.yml) to `.github/workflows/`. It uses this repo as a GitHub Action (`Moosartist/proofcard@v0.2.0`), fails the PR unless the verdict is PASS, and writes the report into the job summary. Pair it with branch protection to make it a real gate.
+**If you have an existing project, even a messy one:** the assistant runs `proofcard map scan`. That gives facts straight from the code: files by part, routes, which browser call hits which handler, where data is read and written, outside services, environment variables, tests, and signs of mess (orphan files, one file doing everything, a button calling an endpoint that doesn't exist). The map is drafted from those facts only. Things the assistant concluded by reading are labelled as such. Reorganisation is written down as **proposals with reasons**, and files are never moved automatically.
 
-Tested on a real pull request ([proofcard-action-demo#1](https://github.com/Moosartist/proofcard-action-demo/pull/1)), using this Action exactly as a user would:
-- regression test without the fix → the step fails with `# Proofcard: FAIL` ([run](https://github.com/Moosartist/proofcard-action-demo/actions/runs/36255797233), attempt 2, commit `7c832a6`)
-- fix pushed → `# Proofcard: PASS` ([run](https://github.com/Moosartist/proofcard-action-demo/actions/runs/36255881107), commit `7a08029`)
+![A messy app mapped as found: proposals, gaps, signs of mess](docs/images/messy-overview.png)
 
-Only `pull_request` on `ubuntu-latest` with `fetch-depth: 0` has been exercised. Other events and runners haven't been tested yet.
+## What's checked by the tool, and what needs judgement
 
-## Bug-fix example
+| The tool detects this mechanically | This needs the assistant's or your judgement |
+|---|---|
+| A mapped file or cited text no longer exists (**stale / broken link**) | Naming the features and describing what the user does |
+| A feature's files changed after its entry was last confirmed (**drift**) | Whether a step's description is *correct*, not just present |
+| Code changed but none of the feature's linked tests did | Whether the tests are *good* |
+| Source files and server routes no feature explains (**gaps**) | Design decisions and their reasons |
+| A browser call whose handler isn't in the feature's journey; imports into another feature not declared in `depends_on` | Whether a suspected bug is real (it's recorded as the assistant's inference) |
+| Calls with no handler, orphan files, files mixing screen/server/data work, same function in several files | Whether to reorganise, and how |
+| "Planned" features whose code already exists; "built" features with no code or no tests | Anything written in a language the scanner doesn't read (see Limits) |
 
-The repo ships [`examples/tiny-shop`](examples/tiny-shop), a cart module with a known bug: `cartTotal` ignores `qty`.
+## Commands
 
-```bash
-npx github:Moosartist/proofcard new "cartTotal ignores qty" --type bugfix --risk medium
-```
+| Command | What it does |
+|---|---|
+| `proofcard map scan` | facts from the code, plus entry points to draft features from |
+| `proofcard map add "<name>" --id x` | add a feature (planned by default) |
+| `proofcard map check` | map vs code: errors (exit 1), gaps, notes; `--strict` also fails on gaps |
+| `proofcard map show <feature>` | one feature, screen to data, with every link's state |
+| `proofcard map impact <file\|feature>` | where to start, what else is affected, what to re-test, open problems |
+| `proofcard map mark <feature>` | record that this entry was reviewed at the current commit (refused if it has broken links) |
+| `proofcard map view` | the interactive HTML map (`.proofcard/map.html`); links go to GitHub lines when the repo has a GitHub remote |
+| `proofcard new` / `verify` | change card and evidence for one change; fails if the change breaks the map or adds unmapped code |
+| `proofcard ready` | release check; not READY while the map is broken, drifted or unconfirmed |
 
-Fill in the card (problem + how it was reproduced, facts with `file:line`, assumptions, must-not-change, `scope: ["src/cart.js", "test/**"]`, `regression: { command: "node --test test/qty.test.js", files: ["test/qty.test.js"] }`), write the failing test, then:
+## Proof for each change (`verify`) and the release (`ready`)
 
-```bash
-npx github:Moosartist/proofcard verify
-```
+These came first and still hold. The map tells you *what* a change touches; these prove the change works:
 
-1. **Before the fix:** `FAIL`, and the regression item says *"fails on the current code: the bug is not fixed yet"*.
-2. **After the fix:** `PASS`, and the regression item says *"fails before the fix (exit 1), passes after (exit 0)"*.
-3. **If the test would have passed on the buggy code anyway:** `FAIL`, *"regression test PASSES on the code before the fix, so it does not detect the bug"*.
+- **`verify`** runs the project's real checks and reports PASS / FAIL / INCOMPLETE from exit codes. For a bug fix, it proves the regression test **fails on the code before the fix** (in a clean git worktree) and passes after. It checks the change stays inside its declared scope, has no secrets in added lines, and doesn't break the map. Evidence scales with the declared risk, so a typo fix needs three checks, not a design review.
+- **`ready`** checks the committed project: a short brief (problem, users, success criteria, what isn't tested, how to run), the map, secrets across the repo, the tests, a smoke run of the real app, and the production dependency audit.
+- The **GitHub Action** (`uses: Moosartist/proofcard@v0.3.0`) runs `verify` on pull requests. It has been tested on a real PR ([FAIL](https://github.com/Moosartist/proofcard-action-demo/actions/runs/36255797233), then [PASS](https://github.com/Moosartist/proofcard-action-demo/actions/runs/36255881107) after the fix). See [`examples/workflow/proofcard.yml`](examples/workflow/proofcard.yml).
+- High-risk changes need a **review attestation**, which is a person's name and notes in the change card. Proofcard does not verify that the review happened.
 
-Full captured output, including the low-risk path: [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md).
+Bug-fix walkthrough: [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md). Brief-and-release walkthrough: [docs/FULL-PATH.md](docs/FULL-PATH.md).
 
 ## How it relates to similar tools
 
-Proofcard doesn't replace any of these. It's meant to sit after them.
-
-| Tool | Its strength | Proofcard's relation |
+| Tool | Its strength | Relation |
 |---|---|---|
-| [OpenSpec](https://github.com/Fission-AI/OpenSpec) | per-change proposals, specs, design, tasks | richer per-change specs; if you use it, link the OpenSpec change from the brief or card, and Proofcard still produces the evidence |
-| [Superpowers](https://github.com/obra/superpowers) | brainstorm → plan → TDD → subagent execution → review skills | its TDD asks the agent to see red then green; Proofcard **re-runs** red/green itself in a clean worktree and in CI |
-| [Spec Kit](https://github.com/github/spec-kit) | constitution → spec → plan → tasks; bug-fix extension | no Python/uv or project layout needed; works as a single command on any repo |
-| [BMad Method](https://github.com/bmad-code-org/BMAD-METHOD) | full agile product lifecycle | a full method with roles and phases; Proofcard is one light path (a one-page brief plus evidence), for when BMad is more than the work needs |
-| [Whiteboard](https://github.com/devdotfast/whiteboard) | agent-drawn diagrams linked to code | optional: the skill suggests linking a Whiteboard diagram in a high-risk card's `design`; never required |
+| [Whiteboard](https://github.com/devdotfast/whiteboard) | a desktop canvas where agents draw diagrams linked to code for a review | Proofcard's map is **persistent** (a file in the repo, one entry per feature), **re-checked against the code on every run**, and viewable as one HTML file. Whiteboard is better for rich, one-off design and review sessions, and both can be used together |
+| [OpenSpec](https://github.com/Fission-AI/OpenSpec) | per-change proposals, specs and tasks | specs describe a change; the map describes the system as it is now. Link an OpenSpec change from a card |
+| [Superpowers](https://github.com/obra/superpowers) | brainstorm → plan → TDD → review skills | its process fits inside the Proofcard loop; Proofcard re-runs red/green itself |
+| [Spec Kit](https://github.com/github/spec-kit) | constitution → spec → plan → tasks | no Python or project layout needed |
+| [BMad Method](https://github.com/bmad-code-org/BMAD-METHOD) | full agile method with roles | Proofcard is a light map plus proof, for when a full method is more than the work needs |
 
-What's actually different: the output is a **verdict computed from execution** (exit codes, pre-fix worktree run, git diff) that fails closed (NOT_RUN is never PASS), and the required evidence **scales with declared risk**. Background: [RESEARCH.md](RESEARCH.md).
+No code or text from these projects was copied (see [RESEARCH.md](RESEARCH.md)).
 
 ## Limits (read these)
 
-- **PASS proves only what your checks exercise.** It doesn't mean the code is correct, secure, or reviewed. A project with weak tests gets a weak PASS.
-- Risk is **self-declared**. An assistant can under-declare. The report shows the declared risk so a human can challenge it.
-- A check that exits 0 without running anything (e.g. a test runner that finds no files) counts as PASS. Proofcard can't see inside your commands. The skill tells the assistant to confirm tests actually ran.
-- The brief is checked for **completeness, not correctness**. Proofcard can't tell whether the design is good; that's what reading it is for.
-- `ready` doesn't re-run each change's `verify` (reports aren't committed). It re-runs the project checks and smoke on the current commit.
-- Manual checks (e.g. clicking through a page) are recorded as text in the brief. They aren't evidence Proofcard can re-run.
-- The secret scan is pattern-based: it misses unknown formats and can flag false positives.
-- The regression proof runs in a fresh worktree **without your installed dependencies**. For projects that need them, set `regression.setup` (e.g. `"npm ci"`). If setup fails, the item is NOT_RUN.
-- Cards are JSON. Scope globs support `*`, `**`, `?` only.
-- Proofcard isn't a substitute for an experienced engineer's review, and it does not verify reviews. For high-risk changes it stays INCOMPLETE until a review attestation is filled in; a PASS on that row means only that the card *claims* a review.
+- **It doesn't make code good by itself.** It makes the structure visible and keeps the description honest. The assistant and you still decide the design.
+- The scanner reads **JavaScript/TypeScript and HTML** (Node servers, Express-style and route-table servers, Next.js-style handlers, `fetch` calls, `fs`/`localStorage` and common database clients). Other languages are listed as files but not parsed. The map still works for them, but gaps and mess won't be detected.
+- Detection uses patterns, not a full parser. It can miss routes written in unusual ways, and "signs of mess" are hints, not verdicts.
+- A link is "found" when the cited text is in the file. That proves the code exists, not that the description is right.
+- Drift detection needs the confirmation commit in the repo's history. A copied project must be re-confirmed with `map mark`, and `ready` treats unconfirmed entries as not ready.
+- The map is only as complete as the features written into it. Unmapped files and routes are reported, but nobody is forced to map everything.
+- Whether a non-programmer can follow the map page hasn't been tested with real users. What was checked is listed in the walkthrough.
+- `verify`/`ready` prove only what your checks exercise. PASS or READY never means secure or bug-free.
 
 ## Development
 
@@ -124,8 +122,8 @@ What's actually different: the output is a **verdict computed from execution** (
 npm test
 ```
 
-Runs unit tests, end-to-end `ready` tests on `examples/tip-split` (published state → INCOMPLETE, with attestation → READY, empty repo, uncommitted work, committed `.env`, broken smoke, no smoke), and scenarios that copy `examples/tiny-shop` into temporary git repos and drive the real CLI (feature → PASS, bug fix red→green, weak regression test → FAIL, failing check → FAIL, low-risk path, scope violation, secret, high risk without review attestation → INCOMPLETE, filled attestation labelled unverified, Action never writes into the workspace, `init`). CI runs them on Ubuntu and Windows, Node 20 and 22.
+Runs 28 tests: unit tests, map tests on `examples/club-events` and `examples/messy-notes` (no invented links, planned vs built, drift, stale links after a rename, impact, unmapped code in `verify`, the messy-app scan, a fresh idea), readiness tests on `examples/tip-split`, and change-evidence scenarios on `examples/tiny-shop`. CI runs on Ubuntu and Windows with Node 20 and 22. There are no runtime dependencies.
 
 ## License
 
-MIT. No code or text from the tools above was copied. See [RESEARCH.md](RESEARCH.md) for their licenses.
+MIT.

@@ -1,7 +1,7 @@
 {
   "name": "proofcard",
-  "version": "0.2.0",
-  "description": "One path for AI-assisted building: project brief, risk-sized change cards, real verification, and an honest release-readiness report.",
+  "version": "0.3.0",
+  "description": "A living map of your project for AI-assisted work: each feature traced from screen to data, linked to real code and tests, checked on every run.",
   "bin": {
     "proofcard": "bin/proofcard.js"
   },
@@ -25,7 +25,10 @@
     "verification",
     "code-review",
     "regression-test",
-    "agents"
+    "agents",
+    "architecture",
+    "project-map",
+    "technical-debt"
   ],
   "repository": {
     "type": "git",

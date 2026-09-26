@@ -1,62 +1,9 @@
-'use strict';
-// Renders the checked map as one self-contained HTML file: a system picture (features × layers)
-// and, for each feature, its path from the screen to the data, with every link's real state.
-const { git } = require('./proofcard');
-const { check, LAYERS } = require('./map');
-
-function linkBase(root, mode) {
-  if (mode === 'none') return null;
-  try {
-    const remote = git(['remote', 'get-url', 'origin'], root).trim();
-    const m = /github\.com[:/]([^/]+\/[^/.]+?)(?:\.git)?$/.exec(remote);
-    if (!m) return null;
-    const commit = git(['rev-parse', 'HEAD'], root).trim();
-    const prefix = git(['rev-parse', '--show-prefix'], root).trim();
-    return `https://github.com/${m[1]}/blob/${commit}/${prefix}`;
-  } catch {
-    return null;
-  }
-}
-
-function buildData(root, opts = {}) {
-  const res = check(root);
-  const base = linkBase(root, opts.links);
-  const link = (file, line) => (base && file && file !== 'unknown' ? `${base}${file}${line ? '#L' + line : ''}` : null);
-  const features = res.map.features.map((f) => {
-    const r = res.resolved[f.id];
-    return {
-      ...f,
-      flow: (f.flow || []).map((s, i) => ({ ...s, state: r.flow[i].state, line: r.flow[i].line || null, href: r.flow[i].state === 'confirmed' || r.flow[i].state === 'unverified' ? link(s.file, r.flow[i].line) : null })),
-      tests: (f.tests || []).map((t, i) => ({ ...t, state: r.tests[i].state, line: r.tests[i].line || null, href: ['confirmed', 'unverified'].includes(r.tests[i].state) ? link(t.file, r.tests[i].line) : null })),
-      findings: res.findings.filter((x) => x.feature === f.id && x.code !== 'OPEN_DEBT'),
-    };
-  });
-  let commit = '';
-  try { commit = git(['rev-parse', '--short', 'HEAD'], root).trim(); } catch { /* no commits */ }
-  return {
-    project: res.map.project || {},
-    structure: res.map.structure || null,
-    proposals: res.map.proposals || [],
-    generated: new Date().toISOString().slice(0, 16).replace('T', ' '),
-    commit,
-    counts: res.counts,
-    layers: LAYERS,
-    features,
-    project_findings: res.findings.filter((x) => !x.feature),
-    files: Object.keys(res.facts.files).length,
-  };
-}
-
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-function renderHtml(data) {
-  const json = JSON.stringify(data).replace(/</g, '\\u003c');
-  return `<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(data.project.name || 'Project')} map</title>
+<title>club-events map</title>
 <style>
 :root{--bg:#f7f7f5;--panel:#fff;--ink:#1d1d1f;--mute:#6b6b70;--line:#e3e3e0;--ok:#1f7a4d;--okbg:#e6f4ec;--warn:#9a6400;--warnbg:#fdf3dc;--bad:#b3261e;--badbg:#fde8e6;--plan:#5b5bd6;--planbg:#ecebfd;--unk:#6b6b70;--unkbg:#efefef;
 --screen:#3b82f6;--frontend:#06b6d4;--api:#8b5cf6;--service:#f59e0b;--data:#10b981;--external:#ef4444}
@@ -68,7 +15,7 @@ header{padding:20px 24px 8px}h1{margin:0 0 4px;font-size:22px}.sub{color:var(--m
 main{display:grid;grid-template-columns:280px 1fr;gap:16px;padding:0 24px 24px}@media(max-width:800px){main{grid-template-columns:1fr;padding:0 12px 16px}header{padding:16px 12px 4px}}
 nav{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px;align-self:start;position:sticky;top:8px}
 nav input{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);margin-bottom:6px}
-nav button span:first-child{flex:1}nav button .st{align-self:center;flex-shrink:0}nav button{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border:0;background:none;color:var(--ink);padding:8px;border-radius:8px;cursor:pointer;font:inherit}
+nav button{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border:0;background:none;color:var(--ink);padding:8px;border-radius:8px;cursor:pointer;font:inherit}
 nav button:hover,nav button.on{background:var(--bg)}.st{font-size:11px;padding:1px 7px;border-radius:99px;white-space:nowrap}
 .st.built{background:var(--okbg);color:var(--ok)}.st.building{background:var(--warnbg);color:var(--warn)}.st.planned{background:var(--planbg);color:var(--plan)}
 section.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:16px;overflow-x:auto}
@@ -95,7 +42,7 @@ table.grid{border-collapse:collapse;width:100%;min-width:720px;font-size:13px}.g
 </header>
 <main><nav><input id="q" placeholder="Find a feature or file…" aria-label="Filter"><div id="list"></div></nav><div id="content"></div></main>
 <script>
-const D=${json};
+const D={"project":{"name":"club-events","summary":"Members see upcoming club events and sign up; the organiser sees who is coming."},"generated":"2026-09-26 18:13","commit":"bdd86ce","counts":{"error":0,"warn":1,"info":0},"layers":["screen","frontend","api","service","data","external"],"features":[{"id":"list-events","name":"See upcoming events","status":"planned","user_action":"Opens the site and sees upcoming events with date, place and free places.","flow":[{"layer":"screen","does":"Home page with the list of events","file":"public/index.html","find":"id=\"events\"","state":"planned","line":null,"href":null},{"layer":"frontend","does":"Loads events from the API and shows them","file":"public/app.js","find":"function loadEvents","state":"planned","line":null,"href":null},{"layer":"api","does":"GET /api/events","file":"server.js","find":"'GET /api/events'","state":"planned","line":null,"href":null},{"layer":"service","does":"Upcoming events only, with places left","file":"src/events.js","find":"function listEvents","state":"planned","line":null,"href":null},{"layer":"data","does":"Reads events and sign-ups from data/db.json","file":"src/store.js","find":"function load","state":"planned","line":null,"href":null}],"depends_on":[],"tests":[],"untested":[],"decisions":[{"decision":"One JSON file instead of a database","why":"a club has tens of events; nothing to install or run"}],"debt":[],"findings":[]},{"id":"sign-up","name":"Sign up for an event","status":"planned","user_action":"Types name and email under an event and presses Sign up; sees a confirmation or why it failed (full, already signed up).","flow":[{"layer":"screen","does":"Sign-up form under each event","file":"public/index.html","find":"id=\"events\"","state":"planned","line":null,"href":null},{"layer":"frontend","does":"Sends the form and shows the result","file":"public/app.js","find":"function signUp","state":"planned","line":null,"href":null},{"layer":"api","does":"POST /api/events/:id/signups","file":"server.js","find":"'POST /api/events/:id/signups'","state":"planned","line":null,"href":null},{"layer":"service","does":"Checks email, capacity and duplicates","file":"src/events.js","find":"function signUp","state":"planned","line":null,"href":null},{"layer":"data","does":"Adds the sign-up to data/db.json","file":"src/store.js","find":"function save","state":"planned","line":null,"href":null}],"depends_on":["list-events"],"tests":[],"untested":[],"decisions":[],"debt":[],"findings":[]},{"id":"attendee-list","name":"Organiser sees who is coming","status":"planned","user_action":"The organiser opens the organiser page, enters the organiser key and sees each event's attendees.","flow":[{"layer":"screen","does":"Organiser page","file":"public/organiser.html","find":"id=\"key\"","state":"planned","line":null,"href":null},{"layer":"frontend","does":"Asks the API with the key, shows the list","file":"public/organiser.js","find":"function loadAttendees","state":"planned","line":null,"href":null},{"layer":"api","does":"GET /api/events/:id/signups, only with the organiser key","file":"server.js","find":"'GET /api/events/:id/signups'","state":"planned","line":null,"href":null},{"layer":"service","does":"Attendee list for one event","file":"src/events.js","find":"function attendees","state":"planned","line":null,"href":null},{"layer":"data","does":"Reads sign-ups","file":"src/store.js","find":"function load","state":"planned","line":null,"href":null}],"depends_on":["sign-up"],"tests":[],"untested":[],"decisions":[{"decision":"A shared organiser key in an environment variable, not accounts","why":"one organiser; accounts would be most of the work"}],"debt":[],"findings":[]},{"id":"reminder","name":"Email reminder the day before","status":"planned","user_action":"Each person signed up gets an email the day before the event.","flow":[{"layer":"service","does":"Finds tomorrow's events and their attendees","file":"src/reminders.js","find":"function dueReminders","state":"planned","line":null,"href":null},{"layer":"external","does":"Sends the email (provider not chosen yet)","file":"unknown","state":"unknown","line":null,"href":null}],"depends_on":["sign-up"],"tests":[],"untested":[],"decisions":[],"debt":[],"findings":[{"level":"warn","code":"UNKNOWN_LINK","message":"step 2 (external) is marked unknown: \"Sends the email (provider not chosen yet)\"","feature":"reminder"}]}],"project_findings":[],"files":4};
 const $=(s)=>document.querySelector(s);
 const e=(s)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LN={screen:'Screen',frontend:'In the browser',api:'API',service:'Server logic',data:'Data',external:'Outside services'};
@@ -107,11 +54,8 @@ $('#counts').innerHTML='<span class="pill ok">'+by('built')+' built</span><span 
 function list(){const q=$('#q').value.toLowerCase();$('#list').innerHTML='<button data-id="" class="'+(cur?'':'on')+'"><span>System overview</span></button>'+D.features.filter(f=>!q||JSON.stringify(f).toLowerCase().includes(q)).map(f=>'<button data-id="'+e(f.id)+'" class="'+(cur===f.id?'on':'')+'"><span>'+e(f.name)+'</span><span class="st '+e(f.status)+'">'+e(f.status)+'</span></button>').join('');
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{location.hash=b.dataset.id?'f='+b.dataset.id:''})}
 function overview(){const cols=D.layers;let h='<section class="card"><h2>System overview</h2><div class="sub">Each row is something the user can do. Each column is a part of the system. Click a feature to follow it.</div><h3>Features × parts of the system</h3><table class="grid"><tr><th>Feature</th>'+cols.map(c=>'<th>'+LN[c]+'</th>').join('')+'<th>Tests</th></tr>';
-for(const f of D.features){h+='<tr><td class="fname" data-id="'+e(f.id)+'">'+e(f.name)+'<br><span class="st '+e(f.status)+'">'+e(f.status)+'</span></td>'+cols.map(c=>'<td>'+f.flow.filter(s=>s.layer===c).map(chip).join('')+'</td>').join('')+'<td>'+(f.tests.length?'<span class="chip '+(f.tests.every(t=>t.state==='confirmed')?'confirmed':'stale')+'">'+f.tests.filter(t=>t.state==='confirmed').length+'/'+f.tests.length+' found</span>':'<span class="empty">none</span>')+'</td></tr>'}
-h+='</table></section>';
-if(D.structure)h+='<section class="card"><h2>How the project is organised</h2><div class="sub">Agreed responsibility of each part. Changes should respect these boundaries.</div><ul>'+Object.entries(D.structure).map(([k,v])=>'<li><code>'+e(k)+'</code> — '+e(v)+'</li>').join('')+'</ul></section>';
-if(D.proposals.length)h+='<section class="card"><h2>Proposed reorganisation</h2><div class="sub">Suggestions with their reason. Nothing is moved until someone decides to.</div><ul>'+D.proposals.map(p=>'<li><span class="st '+(p.status==='done'?'built':'planned')+'">'+e(p.status||'proposed')+'</span> <b>'+e(p.change)+'</b> — '+e(p.why)+(p.serves&&p.serves.length?' <span class="src">(helps: '+p.serves.map(e).join(', ')+')</span>':'')+'</li>').join('')+'</ul></section>';
-const pf=D.project_findings.filter(x=>x.level!=='info'),mess=D.project_findings.filter(x=>x.level==='info');
+for(const f of D.features){h+='<tr><td class="fname" data-id="'+e(f.id)+'">'+e(f.name)+'<br><span class="st '+e(f.status)+'">'+e(f.status)+'</span></td>'+cols.map(c=>'<td>'+f.flow.filter(s=>s.layer===c).map(chip).join('')+'</td>').join('')+'<td>'+(f.tests.length?f.tests.map(chip).join(''):'<span class="empty">none</span>')+'</td></tr>'}
+h+='</table></section>';const pf=D.project_findings.filter(x=>x.level!=='info'),mess=D.project_findings.filter(x=>x.level==='info');
 h+='<section class="card"><h2>Gaps between the map and the code</h2><div class="sub">Found by scanning '+D.files+' files. These are parts of the code no feature explains yet.</div>'+(pf.length?pf.map(x=>'<div class="f '+x.level+'">'+e(x.message)+'</div>').join(''):'<p class="empty">None found.</p>')+'</section>';
 h+='<section class="card"><h2>Signs of mess worth a look</h2><div class="sub">Mechanical hints (mixed responsibilities, orphan files, calls with no handler…). Not verdicts.</div>'+(mess.length?mess.map(x=>'<div class="f info">'+e(x.message)+'</div>').join(''):'<p class="empty">None found.</p>')+'</section>';
 $('#content').innerHTML=h;document.querySelectorAll('td.fname').forEach(td=>td.onclick=()=>{location.hash='f='+td.dataset.id})}
@@ -130,7 +74,3 @@ $('#q').oninput=list;addEventListener('hashchange',route);header();route();
 </script>
 </body>
 </html>
-`;
-}
-
-module.exports = { buildData, renderHtml };

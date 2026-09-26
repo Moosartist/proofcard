@@ -1,62 +1,9 @@
-'use strict';
-// Renders the checked map as one self-contained HTML file: a system picture (features × layers)
-// and, for each feature, its path from the screen to the data, with every link's real state.
-const { git } = require('./proofcard');
-const { check, LAYERS } = require('./map');
-
-function linkBase(root, mode) {
-  if (mode === 'none') return null;
-  try {
-    const remote = git(['remote', 'get-url', 'origin'], root).trim();
-    const m = /github\.com[:/]([^/]+\/[^/.]+?)(?:\.git)?$/.exec(remote);
-    if (!m) return null;
-    const commit = git(['rev-parse', 'HEAD'], root).trim();
-    const prefix = git(['rev-parse', '--show-prefix'], root).trim();
-    return `https://github.com/${m[1]}/blob/${commit}/${prefix}`;
-  } catch {
-    return null;
-  }
-}
-
-function buildData(root, opts = {}) {
-  const res = check(root);
-  const base = linkBase(root, opts.links);
-  const link = (file, line) => (base && file && file !== 'unknown' ? `${base}${file}${line ? '#L' + line : ''}` : null);
-  const features = res.map.features.map((f) => {
-    const r = res.resolved[f.id];
-    return {
-      ...f,
-      flow: (f.flow || []).map((s, i) => ({ ...s, state: r.flow[i].state, line: r.flow[i].line || null, href: r.flow[i].state === 'confirmed' || r.flow[i].state === 'unverified' ? link(s.file, r.flow[i].line) : null })),
-      tests: (f.tests || []).map((t, i) => ({ ...t, state: r.tests[i].state, line: r.tests[i].line || null, href: ['confirmed', 'unverified'].includes(r.tests[i].state) ? link(t.file, r.tests[i].line) : null })),
-      findings: res.findings.filter((x) => x.feature === f.id && x.code !== 'OPEN_DEBT'),
-    };
-  });
-  let commit = '';
-  try { commit = git(['rev-parse', '--short', 'HEAD'], root).trim(); } catch { /* no commits */ }
-  return {
-    project: res.map.project || {},
-    structure: res.map.structure || null,
-    proposals: res.map.proposals || [],
-    generated: new Date().toISOString().slice(0, 16).replace('T', ' '),
-    commit,
-    counts: res.counts,
-    layers: LAYERS,
-    features,
-    project_findings: res.findings.filter((x) => !x.feature),
-    files: Object.keys(res.facts.files).length,
-  };
-}
-
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-function renderHtml(data) {
-  const json = JSON.stringify(data).replace(/</g, '\\u003c');
-  return `<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(data.project.name || 'Project')} map</title>
+<title>messy-notes map</title>
 <style>
 :root{--bg:#f7f7f5;--panel:#fff;--ink:#1d1d1f;--mute:#6b6b70;--line:#e3e3e0;--ok:#1f7a4d;--okbg:#e6f4ec;--warn:#9a6400;--warnbg:#fdf3dc;--bad:#b3261e;--badbg:#fde8e6;--plan:#5b5bd6;--planbg:#ecebfd;--unk:#6b6b70;--unkbg:#efefef;
 --screen:#3b82f6;--frontend:#06b6d4;--api:#8b5cf6;--service:#f59e0b;--data:#10b981;--external:#ef4444}
@@ -95,7 +42,7 @@ table.grid{border-collapse:collapse;width:100%;min-width:720px;font-size:13px}.g
 </header>
 <main><nav><input id="q" placeholder="Find a feature or file…" aria-label="Filter"><div id="list"></div></nav><div id="content"></div></main>
 <script>
-const D=${json};
+const D={"project":{"name":"messy-notes","summary":"A notes page that also stores an English translation of each note. Mapped as found; nothing has been reorganised yet."},"structure":null,"proposals":[{"change":"Move note storage (read/write notes.json) out of server.js into src/notes-store.js","why":"server.js reads and writes notes.json in two places (server.js:13, :20, :26); one store module makes the data path one place to test and fix","serves":["see-notes","add-note"],"status":"proposed"},{"change":"Move the translation call into src/translate.js with a timeout and a fallback","why":"adding a note currently fails if the translation service is slow or down (server.js:23); isolating it lets it be tested with a fake","serves":["add-note"],"status":"proposed"},{"change":"Delete old-utils.js","why":"nothing imports it (scan: orphan); its formatDate duplicates public/script.js and saveNotes writes a backup file nobody reads","serves":[],"status":"proposed"}],"generated":"2026-09-26 18:27","commit":"76b6d9f","counts":{"error":0,"warn":5,"info":10},"layers":["screen","frontend","api","service","data","external"],"features":[{"id":"see-notes","name":"See my notes","status":"built","user_action":"Opens the page and sees the list of notes with their English translation.","flow":[{"layer":"screen","does":"Notes page","file":"public/index.html","find":"id=\"notes\"","state":"confirmed","line":4,"href":"https://github.com/Moosartist/proofcard/blob/76b6d9f12da73d977f542bf67ef2f1ec8792c6bb/examples/messy-notes/public/index.html#L4"},{"layer":"api","does":"Server sends the page and the script","file":"server.js","find":"req.url === '/script.js'","state":"confirmed","line":9,"href":"https://github.com/Moosartist/proofcard/blob/76b6d9f12da73d977f542bf67ef2f1ec8792c6bb/examples/messy-notes/server.js#L9"},{"layer":"frontend","does":"Loads notes and writes them into the page","file":"public/script.js","find":"async function load","state":"confirmed","line":3,"href":"https://github.com/Moosartist/proofcard/blob/76b6d9f12da73d977f542bf67ef2f1ec8792c6bb/examples/messy-notes/public/script.js#L3"},{"layer":"api","does":"GET /api/notes","file":"server.js","find":"req.url === '/api/notes' && req.method === 'GET'","state":"confirmed","line":11,"href":"https://github.com/Moosartist/proofcard/blob/76b6d9f12da73d977f542bf67ef2f1ec8792c6bb/examples/messy-notes/server.js#L11"},{"layer":"data","does":"Reads notes.json from the working directory","file":"server.js","find":"fs.readFileSync('notes.json')","state":"confirmed","line":13,"href":"https://github.com/Moosartist/proofcard/blob/76b6d9f12da73d977f542bf67ef2f1ec8792c6bb/examples/messy-notes/server.js#L13"}],"depends_on":[],"tests":[],"untested":["Everything: the project has no tests"],"decisions":[],"debt":[{"id":"xss","kind":"bug","status":"open","files":["public/script.js"],"text":"Note text is inserted with innerHTML without escaping, so a note containing HTML runs in the page (inferred by the assistant from public/script.js:5; not demonstrated)."}],"findings":[{"level":"warn","code":"NO_TESTS","message":"built, but no test is linked","feature":"see-notes"},{"level":"info","code":"NEVER_CHECKED","message":"never confirmed against the code; run `proofcard map mark see-notes` after reviewing it","feature":"see-notes"}]},{"id":"add-note","name":"Add a note (with English translation)","status":"built","user_action":"Types a note and presses Add; the note appears with an English translation.","flow":[{"layer":"screen","does":"Text box and Add button","file":"public/index.html","find":"onclick=\"addNote()\"","state":"confirmed","line":3,"href":"https://github.com/Moosartist/proofcard/blob/76b6d9f12da73d977f542bf67ef2f1ec8792c6bb/examples/messy-notes/public/index.html#L3"},{"layer":"frontend","does":"Sends the note","file":"public/script.js","find":"async function addNote","state":"confirmed","line":8,"href":"https://github.com/Moosartist/proofcard/blob/76b6d9f12da73d977f542bf67ef2f1ec8792c6bb/examples/messy-notes/public/script.js#L8"},{"layer":"api","does":"POST /api/notes","file":"server.js","find":"req.url === '/api/notes' && req.method === 'POST'","state":"confirmed","line":15,"href":"https://github.com/Moosartist/proofcard/blob/76b6d9f12da73d977f542bf67ef2f1ec8792c6bb/examples/messy-notes/server.js#L15"},{"layer":"external","does":"Asks a translation service for English (needs TRANSLATE_KEY)","file":"server.js","find":"https://api.example-translate.com/v1/translate","state":"confirmed","line":23,"href":"https://github.com/Moosartist/proofcard/blob/76b6d9f12da73d977f542bf67ef2f1ec8792c6bb/examples/messy-notes/server.js#L23"},{"layer":"data","does":"Rewrites the whole notes.json","file":"server.js","find":"fs.writeFileSync('notes.json'","state":"confirmed","line":26,"href":"https://github.com/Moosartist/proofcard/blob/76b6d9f12da73d977f542bf67ef2f1ec8792c6bb/examples/messy-notes/server.js#L26"}],"depends_on":["see-notes"],"tests":[],"untested":["Everything: the project has no tests","What the user sees when the translation service fails: unknown (no error handling in server.js)"],"decisions":[],"debt":[{"id":"translate-hack","kind":"workaround","status":"open","files":["server.js"],"text":"Marked 'temporary hack' in server.js:22. The API key and the note text are put in the URL; the text is not URL-encoded; any failure there leaves the request without a response (inferred by the assistant from server.js:23-25)."},{"id":"rewrite-all","kind":"debt","status":"open","files":["server.js"],"text":"Each new note re-reads and rewrites the whole file; simultaneous adds can lose notes."}],"findings":[{"level":"warn","code":"NO_TESTS","message":"built, but no test is linked","feature":"add-note"},{"level":"info","code":"NEVER_CHECKED","message":"never confirmed against the code; run `proofcard map mark add-note` after reviewing it","feature":"add-note"}]},{"id":"delete-note","name":"Delete a note","status":"building","user_action":"Presses x next to a note to delete it.","flow":[{"layer":"screen","does":"x button next to each note","file":"public/script.js","find":"onclick=\"del(","state":"confirmed","line":5,"href":"https://github.com/Moosartist/proofcard/blob/76b6d9f12da73d977f542bf67ef2f1ec8792c6bb/examples/messy-notes/public/script.js#L5"},{"layer":"frontend","does":"Sends the delete request","file":"public/script.js","find":"async function del","state":"confirmed","line":13,"href":"https://github.com/Moosartist/proofcard/blob/76b6d9f12da73d977f542bf67ef2f1ec8792c6bb/examples/messy-notes/public/script.js#L13"},{"layer":"api","does":"POST /api/notes/delete — no handler exists in this repo","file":"unknown","state":"unknown","line":null,"href":null}],"depends_on":["see-notes"],"tests":[],"untested":["Everything"],"decisions":[],"debt":[{"id":"delete-missing","kind":"bug","status":"open","files":["public/script.js"],"text":"The button calls POST /api/notes/delete but the server has no such route (scan: unhandled-call at public/script.js:14); the server answers 'not found' and the note stays."}],"findings":[{"level":"warn","code":"UNKNOWN_LINK","message":"step 3 (api) is marked unknown: \"POST /api/notes/delete — no handler exists in this repo\"","feature":"delete-note"},{"level":"info","code":"NEVER_CHECKED","message":"never confirmed against the code; run `proofcard map mark delete-note` after reviewing it","feature":"delete-note"}]}],"project_findings":[{"level":"warn","code":"UNMAPPED_FILE","message":"old-utils.js (module) is not part of any feature","file":"old-utils.js"},{"level":"warn","code":"UNMAPPED_ROUTE","message":"/ (server.js:6) is not cited by any feature","file":"server.js"},{"level":"info","code":"MESS_ORPHAN","message":"old-utils.js: not imported or loaded by any file","file":"old-utils.js"},{"level":"info","code":"MESS_MIXED_RESPONSIBILITY","message":"server.js: one file handles backend + data + external","file":"server.js"},{"level":"info","code":"MESS_UNHANDLED_CALL","message":"public/script.js:14: POST /api/notes/delete has no matching route in this repo","file":"public/script.js"}],"files":7};
 const $=(s)=>document.querySelector(s);
 const e=(s)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LN={screen:'Screen',frontend:'In the browser',api:'API',service:'Server logic',data:'Data',external:'Outside services'};
@@ -130,7 +77,3 @@ $('#q').oninput=list;addEventListener('hashchange',route);header();route();
 </script>
 </body>
 </html>
-`;
-}
-
-module.exports = { buildData, renderHtml };

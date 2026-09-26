@@ -28,3 +28,7 @@ No code or text was copied from any of these projects.
 
 **Proofcard**: a zero-dependency Node CLI + a Claude Code skill + a Codex `AGENTS.md` snippet + a GitHub Action.
 One small JSON "change card" per change (problem, what must not change, scope, risk) and one command, `proofcard verify`, that produces an honest report and a non-zero exit code when evidence is missing. Everything else (specs, plans, diagrams) stays with the tools above.
+
+## Addendum (v0.3.0): the living map
+
+The goal moved from "prove each change" to "keep a map of the whole project that stays true". Whiteboard was re-read for this purpose. It draws agent-made diagrams linked to code inside a desktop app, per review. It doesn't keep a per-feature description of the system in the repo, and it doesn't re-check such a description against the code on every run. That persistent, self-checking map is what Proofcard now builds, as a JSON file and one HTML page, with no app to install. None of the tools above keep a feature-level map that fails when it goes stale, so v0.3.0 builds that and reuses the existing `verify`/`ready` for proof.
